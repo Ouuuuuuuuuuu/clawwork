@@ -1,10 +1,10 @@
 [project]
 name = "daming-emperor"
 version = "0.1.0"
-description = "Add your description here"
+description = "重返大明 - 历代皇帝模拟器"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = [
-    "openai>=2.29.0",
+    "requests>=2.32.0",
     "streamlit>=1.55.0",
 ]

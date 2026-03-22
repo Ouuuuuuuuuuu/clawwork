@@ -7,7 +7,7 @@
 import streamlit as st
 import random
 from datetime import datetime, timedelta
-from openai import OpenAI
+import requests
 import json
 import copy
 
@@ -126,35 +126,39 @@ def init_game():
             "game_over_reason": None,
             "achievements": [],
         }
-    
-    if "client" not in st.session_state:
-        # 使用 SiliconFlow API (KimiCode)
-        # 强制从 Secrets 读取 Key
-        try:
-            API_KEY = st.secrets["SILICONFLOW_API_KEY"]
-            st.session_state.client = OpenAI(
-                api_key=API_KEY,
-                base_url="https://api.siliconflow.cn/v1"
-            )
-        except KeyError:
-            st.error("❌ 严重错误：未检测到 SILICONFLOW_API_KEY。请在 .streamlit/secrets.toml 中配置 Key。")
 
 def get_llm_response(system_prompt, user_prompt, temperature=0.8):
-    """调用 SiliconFlow API 获取回复"""
+    """调用 SiliconFlow API 获取回复 (参考hka项目)"""
     try:
-        client = st.session_state.client
-        response = client.chat.completions.create(
-            model="deepseek-ai/DeepSeek-V2.5",
-            messages=[
+        api_key = st.secrets.get("SILICONFLOW_API_KEY", "")
+        if not api_key:
+            return "【陛下恕罪，尚未配置 API Key，无法接通朝廷通信】"
+        
+        url = "https://api.siliconflow.cn/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "model": "Pro/deepseek-ai/DeepSeek-V3.2",
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=temperature,
-            max_tokens=800
-        )
-        return response.choices[0].message.content
+            "temperature": temperature,
+            "max_tokens": 800
+        }
+        
+        response = requests.post(url, headers=headers, json=data, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result["choices"][0]["message"]["content"]
+        else:
+            return f"【陛下恕罪，通信有碍】API Error: {response.status_code}"
+            
     except Exception as e:
-        # 如果 API 调用失败，返回备用回复
         return f"【陛下恕罪，通信有碍】{str(e)[:50]}..."
 
 # ============== 游戏机制 ==============
@@ -517,8 +521,6 @@ def render_game_over():
     with col1:
         if st.button("🔄 重新开始", type="primary", use_container_width=True):
             del st.session_state.game_state
-            if "client" in st.session_state:
-                del st.session_state.client
             st.rerun()
     with col2:
         if st.button("👑 换一位皇帝", use_container_width=True):
