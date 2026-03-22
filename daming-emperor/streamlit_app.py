@@ -130,11 +130,17 @@ def init_game():
 def get_llm_response(system_prompt, user_prompt, temperature=0.8):
     """调用 SiliconFlow API 获取回复"""
     try:
-        # 从 Secrets 读取 API Key，并去除可能的引号
-        api_key = st.secrets.get("SILICONFLOW_API_KEY", "").strip().strip('"\'')
+        # 从 Secrets 读取 API Key (Streamlit会自动处理TOML格式)
+        api_key = st.secrets.get("SILICONFLOW_API_KEY", "")
+        
+        # 调试信息 - 显示key前10位
+        if api_key:
+            debug_key = api_key[:10] + "..."
+        else:
+            debug_key = "未获取到"
         
         if not api_key or api_key == "sk-your-api-key-here":
-            return "【陛下恕罪，尚未配置有效的 SILICONFLOW_API_KEY，请前往 Streamlit Cloud Secrets 配置】"
+            return f"【陛下恕罪，尚未配置有效的 SILICONFLOW_API_KEY (调试: {debug_key})，请前往 Streamlit Cloud Secrets 配置】"
         
         url = "https://api.siliconflow.cn/v1/chat/completions"
         headers = {
@@ -158,7 +164,7 @@ def get_llm_response(system_prompt, user_prompt, temperature=0.8):
             result = response.json()
             return result["choices"][0]["message"]["content"]
         elif response.status_code == 401:
-            return "【陛下恕罪，API Key 无效或已过期】"
+            return f"【陛下恕罪，API Key 无效或已过期 (调试: {debug_key})】"
         else:
             return f"【陛下恕罪，通信有碍】API 错误码: {response.status_code}"
             
