@@ -30,12 +30,13 @@
 
 ### 1. 配置 API Key
 
-编辑 `.streamlit/secrets.toml`，填入您的 KimiCode API Key：
+编辑 `.streamlit/secrets.toml`，填入您的 SiliconFlow API Key：
 
 ```toml
-[kimicode]
-api_key = "sk-your-api-key-here"
+SILICONFLOW_API_KEY = "sk-your-api-key-here"
 ```
+
+获取 API Key：https://cloud.siliconflow.cn/
 
 ### 2. 安装依赖
 
@@ -57,9 +58,10 @@ uv run streamlit run streamlit_app.py
 3. 在 Secrets 中添加：
 
 ```toml
-[kimicode]
-api_key = "your-api-key"
+SILICONFLOW_API_KEY = "your-api-key"
 ```
+
+4. 点击 **Deploy**！
 
 ## 🎯 玩法说明
 
@@ -97,7 +99,7 @@ api_key = "your-api-key"
 ## 🛠️ 技术栈
 
 - **Streamlit**：Web 界面
-- **KimiCode API**：AI 对话生成
+- **SiliconFlow API**：AI 对话生成（DeepSeek-V2.5）
 - **OpenAI SDK**：API 调用
 
 ## 📁 项目结构

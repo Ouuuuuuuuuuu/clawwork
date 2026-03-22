@@ -128,19 +128,23 @@ def init_game():
         }
     
     if "client" not in st.session_state:
-        # 使用 KimiCode API
-        api_key = st.secrets.get("kimicode", {}).get("api_key", "")
-        st.session_state.client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.kimicode.com/v1"
-        )
+        # 使用 SiliconFlow API (KimiCode)
+        # 强制从 Secrets 读取 Key
+        try:
+            API_KEY = st.secrets["SILICONFLOW_API_KEY"]
+            st.session_state.client = OpenAI(
+                api_key=API_KEY,
+                base_url="https://api.siliconflow.cn/v1"
+            )
+        except KeyError:
+            st.error("❌ 严重错误：未检测到 SILICONFLOW_API_KEY。请在 .streamlit/secrets.toml 中配置 Key。")
 
 def get_llm_response(system_prompt, user_prompt, temperature=0.8):
-    """调用 KimiCode API 获取回复"""
+    """调用 SiliconFlow API 获取回复"""
     try:
         client = st.session_state.client
         response = client.chat.completions.create(
-            model="kimi-k2.5",
+            model="deepseek-ai/DeepSeek-V2.5",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
