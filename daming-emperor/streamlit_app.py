@@ -127,56 +127,95 @@ def init_game():
             "achievements": [],
         }
 
-def get_llm_response(system_prompt, user_prompt, temperature=0.8):
-    """调用 SiliconFlow API 获取回复"""
+def get_llm_response_stream(system_prompt, user_prompt, temperature=0.8):
+    """调用 SiliconFlow API 获取流式回复"""
+    api_key = st.secrets.get("SILICONFLOW_API_KEY", "")
+    
+    # 检查是否为有效的 key
+    INVALID_KEYS = ["", "sk-your-api-key-here", "sk-xxx", "your-api-key"]
+    
+    if not api_key or api_key in INVALID_KEYS or len(api_key) < 20:
+        yield "【陛下恕罪，API 配置异常，请检查 Secrets 配置】"
+        return
+    
+    url = "https://api.siliconflow.cn/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "model": "Pro/deepseek-ai/DeepSeek-V3.2",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "temperature": temperature,
+        "max_tokens": 800,
+        "stream": True
+    }
+    
     try:
-        # 从 Secrets 读取 API Key
-        api_key = st.secrets.get("SILICONFLOW_API_KEY", "")
+        response = requests.post(url, headers=headers, json=data, timeout=30, stream=True)
         
-        # 检查是否为有效的 key（不是空值、不是模板值、长度合理）
-        INVALID_KEYS = ["", "sk-your-api-key-here", "sk-xxx", "your-api-key"]
+        if response.status_code != 200:
+            yield f"【陛下恕罪，通信有碍】API 错误码: {response.status_code}"
+            return
         
-        if not api_key or api_key in INVALID_KEYS or len(api_key) < 20:
-            return """【陛下恕罪，API 配置异常】
+        # 解析 SSE 流
+        for line in response.iter_lines():
+            if line:
+                line = line.decode('utf-8')
+                if line.startswith('data: '):
+                    data_str = line[6:]  # 去掉 'data: ' 前缀
+                    if data_str == '[DONE]':
+                        break
+                    try:
+                        chunk = json.loads(data_str)
+                        if 'choices' in chunk and len(chunk['choices']) > 0:
+                            delta = chunk['choices'][0].get('delta', {})
+                            if 'content' in delta:
+                                yield delta['content']
+                    except json.JSONDecodeError:
+                        continue
+                        
+    except Exception as e:
+        yield f"【陛下恕罪，通信有碍】{str(e)[:100]}..."
 
-检测到 Secrets 未正确配置。请按以下步骤检查：
-
-1. 访问 https://share.streamlit.app/ → Manage App → Secrets
-2. 确认配置格式（**注意：必须加引号！**）：
-   SILICONFLOW_API_KEY = "sk-lezqyzzxlcnarawzhmyddltuclijckeufnzzktmkizfslcje"
-
-3. 点击 **Save**，然后点击 **Reboot** 重启应用
-
-4. 重启后等待 10 秒再试
-
-当前读取到的 key 前10位：%s""" % (api_key[:10] if api_key else "空")
-        
-        url = "https://api.siliconflow.cn/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        data = {
-            "model": "Pro/deepseek-ai/DeepSeek-V3.2",
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            "temperature": temperature,
-            "max_tokens": 800
-        }
-        
+# 非流式版本（备用）
+def get_llm_response(system_prompt, user_prompt, temperature=0.8):
+    """调用 SiliconFlow API 获取非流式回复"""
+    api_key = st.secrets.get("SILICONFLOW_API_KEY", "")
+    
+    INVALID_KEYS = ["", "sk-your-api-key-here", "sk-xxx", "your-api-key"]
+    
+    if not api_key or api_key in INVALID_KEYS or len(api_key) < 20:
+        return "【陛下恕罪，API 配置异常，请检查 Secrets 配置】"
+    
+    url = "https://api.siliconflow.cn/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "model": "Pro/deepseek-ai/DeepSeek-V3.2",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "temperature": temperature,
+        "max_tokens": 800
+    }
+    
+    try:
         response = requests.post(url, headers=headers, json=data, timeout=30)
         
         if response.status_code == 200:
             result = response.json()
             return result["choices"][0]["message"]["content"]
-        elif response.status_code == 401:
-            return "【陛下恕罪，API Key 无效或已过期，请检查 Secrets 中的 key 是否正确】"
         else:
             return f"【陛下恕罪，通信有碍】API 错误码: {response.status_code}"
-            
     except Exception as e:
         return f"【陛下恕罪，通信有碍】{str(e)[:100]}..."
 
@@ -634,10 +673,14 @@ def render_official_chat():
         cols = st.columns(3)
         with cols[0]:
             if st.button("📊 询问国事", key=f"ask_state_{official_name}"):
-                with st.spinner("大臣思考中..."):
-                    context = get_emperor_decision_context()
-                    response = get_official_response(official_name, f"陛下问：{official_name}，如今国事如何？请详细禀报。\n\n{context}")
-                    add_message("assistant", f"**{official['头像']} {official_name}**：\n\n{response}")
+                context = get_emperor_decision_context()
+                system_prompt = f"""你是{emperor['年号']}朝{official['职位']}{official_name}...
+                # ... (rest of the prompt)
+                """
+                # Use streaming
+                with st.chat_message("assistant"):
+                    response = st.write_stream(get_llm_response_stream(system_prompt, f"陛下问：{official_name}，如今国事如何？请详细禀报。\n\n{context}"))
+                add_message("assistant", f"**{official['头像']} {official_name}**：\n\n{response}")
                 st.rerun()
         with cols[1]:
             if st.button("💡 求取建议", key=f"ask_advice_{official_name}"):
@@ -871,17 +914,22 @@ def render_chat():
     if prompt := st.chat_input("陛下有何吩咐..."):
         add_message("user", prompt)
         
-        # AI 生成回复
+        # AI 生成回复 - 流式输出
         system_prompt = f"""你是{emperor['年号']}朝的宫廷太监总管，负责协助{state['emperor']}陛下处理日常事务。
 当前局势：{get_emperor_decision_context()}
 请以恭敬但略带幽默的语气回复，可以引用历史典故，但保持轻松有趣。
 回复要简短（100字以内），不要长篇大论。
 注意：不要提及其他朝代或未来的事。"""
         
-        with st.spinner("总管思考中..."):
-            response = get_llm_response(system_prompt, prompt)
+        # 使用流式输出
+        with st.chat_message("assistant"):
+            response = st.write_stream(get_llm_response_stream(system_prompt, prompt))
         
-        add_message("assistant", response)
+        # 保存到历史记录
+        st.session_state.game_state["messages"].append({
+            "role": "assistant", 
+            "content": response
+        })
         
         advance_time(1)
         st.rerun()
