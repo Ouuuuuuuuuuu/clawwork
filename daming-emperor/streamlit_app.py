@@ -128,10 +128,12 @@ def init_game():
         }
 
 def get_llm_response(system_prompt, user_prompt, temperature=0.8):
-    """调用 SiliconFlow API 获取回复 (参考hka项目)"""
+    """调用 SiliconFlow API 获取回复"""
     try:
-        # 参考hka项目：优先从 Secrets 读取，否则使用默认Key
-        api_key = st.secrets.get("SILICONFLOW_API_KEY", "sk-lezqyzzxlcnarawzhmyddltuclijckeufnzzktmkizfslcje")
+        # 只从 Secrets 读取 API Key
+        api_key = st.secrets.get("SILICONFLOW_API_KEY", "")
+        if not api_key:
+            return "【陛下恕罪，尚未配置 API Key，无法接通朝廷通信】"
         
         url = "https://api.siliconflow.cn/v1/chat/completions"
         headers = {
@@ -155,7 +157,7 @@ def get_llm_response(system_prompt, user_prompt, temperature=0.8):
             result = response.json()
             return result["choices"][0]["message"]["content"]
         else:
-            return f"【陛下恕罪，通信有碍】API Error: {response.status_code} - {response.text[:100]}"
+            return f"【陛下恕罪，通信有碍】API Error: {response.status_code}"
             
     except Exception as e:
         return f"【陛下恕罪，通信有碍】{str(e)[:100]}..."
