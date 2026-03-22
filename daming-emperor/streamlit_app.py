@@ -174,8 +174,9 @@ def get_llm_response_stream(system_prompt, user_prompt, temperature=0.8):
                         chunk = json.loads(data_str)
                         if 'choices' in chunk and len(chunk['choices']) > 0:
                             delta = chunk['choices'][0].get('delta', {})
-                            if 'content' in delta:
-                                yield delta['content']
+                            content = delta.get('content')
+                            if content:  # 只yield非空内容
+                                yield content
                     except json.JSONDecodeError:
                         continue
                         
@@ -674,12 +675,11 @@ def render_official_chat():
         with cols[0]:
             if st.button("📊 询问国事", key=f"ask_state_{official_name}"):
                 context = get_emperor_decision_context()
-                system_prompt = f"""你是{emperor['年号']}朝{official['职位']}{official_name}...
-                # ... (rest of the prompt)
-                """
-                # Use streaming
                 with st.chat_message("assistant"):
-                    response = st.write_stream(get_llm_response_stream(system_prompt, f"陛下问：{official_name}，如今国事如何？请详细禀报。\n\n{context}"))
+                    response = st.write_stream(get_llm_response_stream(
+                        f"你是{emperor['年号']}朝{official['职位']}{official_name}，{official['简介']}。性格：{official['性格']}。忠诚：{official['忠诚']}/100，能力：{official['能力']}/100。当前是{emperor['年号']}{st.session_state.game_state['year']}年{st.session_state.game_state['month']}月，{st.session_state.game_state['emperor']}陛下咨询朝政。请用古雅文言回复，保持角色一致性。",
+                        f"陛下问：{official_name}，如今国事如何？请详细禀报。\n\n{context}"
+                    ))
                 add_message("assistant", f"**{official['头像']} {official_name}**：\n\n{response}")
                 st.rerun()
         with cols[1]:
