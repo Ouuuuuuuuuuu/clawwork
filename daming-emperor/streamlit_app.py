@@ -130,9 +130,8 @@ def init_game():
 def get_llm_response(system_prompt, user_prompt, temperature=0.8):
     """调用 SiliconFlow API 获取回复 (参考hka项目)"""
     try:
-        api_key = st.secrets.get("SILICONFLOW_API_KEY", "")
-        if not api_key:
-            return get_fallback_response(user_prompt)
+        # 参考hka项目：优先从 Secrets 读取，否则使用默认Key
+        api_key = st.secrets.get("SILICONFLOW_API_KEY", "sk-lezqyzzxlcnarawzhmyddltuclijckeufnzzktmkizfslcje")
         
         url = "https://api.siliconflow.cn/v1/chat/completions"
         headers = {
@@ -156,48 +155,10 @@ def get_llm_response(system_prompt, user_prompt, temperature=0.8):
             result = response.json()
             return result["choices"][0]["message"]["content"]
         else:
-            # API 错误时使用备用回复
-            return get_fallback_response(user_prompt)
+            return f"【陛下恕罪，通信有碍】API Error: {response.status_code} - {response.text[:100]}"
             
     except Exception as e:
-        # 异常时使用备用回复
-        return get_fallback_response(user_prompt)
-
-def get_fallback_response(user_prompt):
-    """API 失败时的备用回复"""
-    import random
-    
-    # 根据用户输入关键词返回不同的备用回复
-    prompt_lower = user_prompt.lower()
-    
-    if "国事" in prompt_lower or "局势" in prompt_lower:
-        responses = [
-            "启奏陛下，如今天下太平，四海升平。然边关仍需提防，内政亦当整顿，望陛下圣裁。",
-            "陛下，臣观如今天下，虽有小小波折，然大局尚稳。只要陛下勤政爱民，社稷可保无虞。",
-            "禀陛下，近年风调雨顺，百姓安居乐业。然朝中仍有奸佞，望陛下明察秋毫。"
-        ]
-    elif "建议" in prompt_lower or "良策" in prompt_lower:
-        responses = [
-            "臣斗胆进言：当轻徭薄赋，与民休息；整顿吏治，严惩贪腐；练兵备战，以防不测。",
-            "陛下，臣有一策：可开言路，纳忠谏；省刑罚，薄税敛；选贤能，远小人。",
-            "启奏陛下，当务之急在于安抚民心，整顿军备，清查吏治，如此方可长治久安。"
-        ]
-    elif "赏赐" in prompt_lower or "问责" in prompt_lower:
-        responses = [
-            "臣惶恐！陛下隆恩，臣没齿难忘。定当肝脑涂地，以报陛下知遇之恩！",
-            "陛下明鉴！臣若有错，愿受责罚；若有功，也不敢居功自傲，一切皆赖陛下洪福。",
-            "臣叩首谢恩！陛下天高地厚之恩，臣唯有尽忠报国，以死相报！"
-        ]
-    else:
-        responses = [
-            "陛下圣明，臣谨遵圣谕。",
-            "启奏陛下，臣已知晓，定当竭力办妥。",
-            "陛下旨意，臣岂敢违背，即刻照办。",
-            "臣愚钝，然陛下教诲，臣铭记于心。",
-            "陛下天威，臣等唯命是从。"
-        ]
-    
-    return random.choice(responses)
+        return f"【陛下恕罪，通信有碍】{str(e)[:100]}..."
 
 # ============== 游戏机制 ==============
 def setup_emperor(emperor_name):
